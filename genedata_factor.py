@@ -100,7 +100,7 @@ def reorganize_stock_data(df,tp="s",is_smooth=False):
 start = time.time()
 res=[]
 
-def process_id(id,is_smooth=False):
+def process_id(id,is_smooth=True):
     # with label
     data =all_data[id][:-300]
 
@@ -163,7 +163,7 @@ for item in results:
 print(cnt,len(results))
 print("start")
 s = time.time()
-with open('train_factor_r1.json','w')as f:
+with open('train_factor_1_steady.json','w')as f:
     f.write(json.dumps(results))
 print("done")
 
