@@ -21,13 +21,17 @@ def execute_all_methods(cls,instance=None):
      
     ignore_name =['Aroon_2', 'BBANDS_3', 'HT_PHASOR', 'HT_SINE', 'MACDFIX_3', 
                   'MACD_3', 'MININDEX', 'STOCH', 'STOCHF', 'STOCHRSI', 'STOCH_2']
+    special_name =['Aroon_2', 'BBANDS_3', 'MACDFIX_3', 
+                  'MACD_3', 'STOCH', 'STOCHF', 'STOCHRSI', 'STOCH_2']
     res ={}
     for method_name in methods:
         method = getattr(instance, method_name)
         vals = method()
         if method_name in ignore_name:
+            continue
+        if method_name in special_name:
             if isinstance(vals,dict):
-                for k,val in vals.items():
+                for k,val in vals.item():
                     subname = k
                     res[subname] = val.item()
             else:
@@ -59,7 +63,7 @@ all_data = [data.iloc[index[0]:index[2]] for index in indexs]
 
 
 
-def reorganize_stock_data(df,tp="s"):
+def reorganize_stock_data(df,tp="s",is_smooth=False):
     if tp == "s":
         k = 15
     elif tp =='d':
@@ -85,7 +89,10 @@ def reorganize_stock_data(df,tp="s"):
     ohlcv_df = df.groupby('group').agg(agg_dict)
     # 重置索引并清理列名（可选）
     ohlcv_df = ohlcv_df.reset_index(drop=True)
-    
+    if is_smooth:
+        window = 5  # 5日平滑
+        cols_to_smooth = ['open', 'high', 'low', 'close']
+        ohlcv_df[cols_to_smooth] = ohlcv_df[cols_to_smooth].rolling(window=window).mean()
     return ohlcv_df
 
 
@@ -93,14 +100,14 @@ def reorganize_stock_data(df,tp="s"):
 start = time.time()
 res=[]
 
-def process_id(id):
+def process_id(id,is_smooth=False):
     # with label
     data =all_data[id][:-300]
-    day = reorganize_stock_data(data,"d")
-    minute = reorganize_stock_data(data[-9000:],"m")[-120:]
-    hour = reorganize_stock_data(data[-86400:],"h")[-120:]
-    second = reorganize_stock_data(data[-7200:],"s")[-120:]
-    
+
+    day = reorganize_stock_data(data,"d",is_smooth)
+    minute = reorganize_stock_data(data[-9000:],"m",is_smooth)[-120:]
+    hour = reorganize_stock_data(data[-86400:],"h",is_smooth)[-120:]
+    second = reorganize_stock_data(data[-7200:],"s",is_smooth)[-120:]
 
     last300s = all_data[id]['close'][-300:].values
     cur_v = all_data[id]['close'].values[-300]
@@ -108,7 +115,7 @@ def process_id(id):
     upper,down = (last300_rates>0.0002).sum(),(last300_rates<-0.0002).sum()
     steady = len(last300s)-upper-down
     
-    label = 1 if last300s[-1]>0 else -1
+    label = 1 if last300_rates [-1]>0 else -1
 
     day_last_10= day['close'].values[-10:].tolist()
     hour_last_10=  hour['close'].values[-10:].tolist()
@@ -138,16 +145,17 @@ def process_id(id):
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
         "label": label,
-        "upnum": upper,
-        "down_num": down,
-        "steady_num": steady
+        "upnum": upper.item(),
+        "down_num": down.item(),
+        "steady_num": steady.item()
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
 
 # with Pool(processes=num_processes) as pool:
-#     results = pool.map(process_id, range(len(all_data)//2))
+#     results = pool.map(process_id, range(len(all_data)//2,len(all_data)))
+results =[]
 for i in range(len(all_data)//2):
-    results = process_id(i)
+    results.append(process_id(i))
 cnt= 0
 for item in results:
     if item['label']==1:
