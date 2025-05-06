@@ -41,6 +41,7 @@ class DataProcessor():
     def get_random_factornames(self,k=50,seed=None):
         valid_columes = self.data.loc[:, self.data.nunique() != 1].columns.to_list()
         valid_columes.remove("label")
+        valid_columes.remove("rise_ratio")
         if seed:
             random.seed(seed)
         if k==-1:
@@ -54,7 +55,7 @@ class DataProcessor():
         X = self.data[factornames].values
         return X
 
-dataprocessor = DataProcessor(["train_factor_1.json","train_factor_2.json"])
+dataprocessor = DataProcessor(["train_factor_r1.json"])
 factorls = dataprocessor.get_random_factornames()
 X,y = dataprocessor.get_X_y(factorls)
 

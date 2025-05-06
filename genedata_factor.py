@@ -3,7 +3,7 @@ import json
 import time
 from multiprocessing import Pool, cpu_count
 from analyse import *
-with open("datas/train_index",'r',encoding='utf-8')as f:
+with open("/data/users/zzp/trade_data/datas/train_index",'r',encoding='utf-8')as f:
     indexs = json.loads(f.read())
 
 import inspect
@@ -36,7 +36,7 @@ def execute_all_methods(cls,instance=None):
 
 
 
-file_path = 'datas/BTC_USDT-1s.feather'
+file_path = '/data/users/zzp/trade_data/datas/BTC_USDT-1s.feather'
 
 data = pd.read_feather(file_path)
 
@@ -113,6 +113,18 @@ def process_id(id):
     minute_index = execute_all_methods(Analysis,minute)
     second_index = execute_all_methods(Analysis,second)
     del day,hour,minute,second
+
+    # ===== 计算最近5分钟上涨比例 =====
+    last5min = all_data[id][-300:]
+    #last5min = last5min.sort_index()
+    if len(last5min) < 300:
+        rise_ratio = None  # 不足5个数据点则无法计算
+    else:
+        base_price = last5min['open'].values[0]
+        close_prices = last5min['close'].values
+        higher_count = sum(p > base_price for p in close_prices)
+        rise_ratio = higher_count / len(close_prices)
+
     return {
         "day_factor":day_index ,
         "hour_factor":hour_index,
@@ -122,12 +134,14 @@ def process_id(id):
         "hourlast_10": hour_last_10,
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
-        "label": label
+        "label": label,
+
+        "rise_ratio": rise_ratio
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
 
 with Pool(processes=num_processes) as pool:
-    results = pool.map(process_id, range(len(all_data)//2))
+    results = pool.map(process_id, range(len(all_data)//4))
 
 cnt= 0
 for item in results:
@@ -143,9 +157,5 @@ print("done")
 
 print(time.time()-start)
 
-
-
-
-  
-
-
+print("示例样本数据如下：")
+print(json.dumps(results[0], indent=2))  # 仅输出第一条结果，格式化便于查看
