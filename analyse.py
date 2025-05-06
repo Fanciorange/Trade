@@ -20,7 +20,7 @@ class Analysis:
         # 秒级rsi  日级rsi  分级别rsi 
         # 使用 ta 库计算 RSI
         # 参数 window 是 RSI 的周期，默认为 14
-        rsi = ta.RSI(df['close'], timeperiod=2)
+        rsi = ta.RSI(self.close, timeperiod=2)
         rsimean = rsi[-6:].mean()
         if rsimean <30:
             return 0
@@ -45,7 +45,8 @@ class Analysis:
                                             fastperiod=12, 
                                             slowperiod=26, 
                                             signalperiod=9)
-        return macd[-1],macdsignal[-1],macdhist[-1]
+        return {"macd":macd[-1],"macdsignal":macdsignal[-1],
+                "macdhist":macdhist[-1]}
     def BBANDS_3(self ):
             # 提取收盘价序列
         close = self.close
@@ -56,7 +57,8 @@ class Analysis:
                                                             nbdevup=2,     # 上轨标准差倍数
                                                             nbdevdn=2,     # 下轨标准差倍数
                                                             matype=0) 
-        return upper_band[-1], middle_band[-1], lower_band[-1]
+        return {"upper_band":upper_band[-1],
+                "middle_band:":middle_band[-1],"lower_band":lower_band[-1]}
     def EMA(self ):
         # 提取收盘价序列
         close = self.close
@@ -85,7 +87,7 @@ class Analysis:
         high = self.high
         low = self.low
         aroondown, aroonup = ta.AROON(high, low, timeperiod=14)
-        return aroondown[-1],aroonup[-1]
+        return {"aroondown":aroondown[-1],"aroonup":aroonup[-1]}
     def AROONOSC(self ):
         high = self.high
         low = self.low

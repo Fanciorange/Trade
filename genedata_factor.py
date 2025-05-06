@@ -23,11 +23,19 @@ def execute_all_methods(cls,instance=None):
                   'MACD_3', 'MININDEX', 'STOCH', 'STOCHF', 'STOCHRSI', 'STOCH_2']
     res ={}
     for method_name in methods:
-        if method_name in ignore_name:
-            continue
         method = getattr(instance, method_name)
-        vals = method().item()
-        res[method_name] = vals
+        vals = method()
+        if method_name in ignore_name:
+            if isinstance(vals,dict):
+                for k,val in vals.items():
+                    subname = k
+                    res[subname] = val.item()
+            else:
+                 for i,val in enumerate(vals):
+                    subname = method_name+f"_{i+1}"
+                    res[subname] = val.item()
+        else:
+            res[method_name] = vals.item()
         
     return res
 
@@ -91,9 +99,16 @@ def process_id(id):
     day = reorganize_stock_data(data,"d")
     minute = reorganize_stock_data(data[-9000:],"m")[-120:]
     hour = reorganize_stock_data(data[-86400:],"h")[-120:]
-    second = reorganize_stock_data(data[-2400:],"s")[-120:]
-    v1,v2= second['close'].values[-1], all_data[id]["close"].values[-1]
-    label = 1 if (v2-v1)/v1>0.001 else -1
+    second = reorganize_stock_data(data[-7200:],"s")[-120:]
+    
+
+    last300s = all_data[id]['close'][-300:].values
+    cur_v = all_data[id]['close'].values[-300]
+    last300_rates = (last300s-cur_v)/cur_v
+    upper,down = (last300_rates>0.0002).sum(),(last300_rates<-0.0002).sum()
+    steady = len(last300s)-upper-down
+    
+    label = 1 if last300s[-1]>0 else -1
 
     day_last_10= day['close'].values[-10:].tolist()
     hour_last_10=  hour['close'].values[-10:].tolist()
@@ -122,13 +137,17 @@ def process_id(id):
         "hourlast_10": hour_last_10,
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
-        "label": label
+        "label": label,
+        "upnum": upper,
+        "down_num": down,
+        "steady_num": steady
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
 
-with Pool(processes=num_processes) as pool:
-    results = pool.map(process_id, range(len(all_data)//2))
-
+# with Pool(processes=num_processes) as pool:
+#     results = pool.map(process_id, range(len(all_data)//2))
+for i in range(len(all_data)//2):
+    results = process_id(i)
 cnt= 0
 for item in results:
     if item['label']==1:
