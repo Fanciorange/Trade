@@ -37,11 +37,10 @@ for fname, corr, _ in top_corrs:
     feature_values = X[:, idx]
 
     plt.figure(figsize=(8, 5))
-    plt.scatter(feature_values, y, alpha=0.7)
-    plt.title(f"{fname} vs Label\nPearson Corr = {corr:.4f}")
+    plt.scatter(feature_values, y, alpha=0.7, s=5, c='black')
+    plt.title(f"{fname} vs rise_ratio\nPearson Corr = {corr:.4f}")
     plt.xlabel(fname)
-    plt.ylabel("Label")
-    plt.grid(True)
+    plt.ylabel("rise_ratio")
     plt.tight_layout()
 
     filename = f"images/{fname}.png"
