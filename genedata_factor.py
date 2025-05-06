@@ -151,11 +151,11 @@ def process_id(id,is_smooth=False):
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
 
-# with Pool(processes=num_processes) as pool:
-#     results = pool.map(process_id, range(len(all_data)//2,len(all_data)))
-results =[]
-for i in range(len(all_data)//2):
-    results.append(process_id(i))
+with Pool(processes=num_processes) as pool:
+    results = pool.map(process_id, range(len(all_data)//2,len(all_data)))
+# results =[]
+# for i in range(len(all_data)//2):
+#     results.append(process_id(i))
 cnt= 0
 for item in results:
     if item['label']==1:
