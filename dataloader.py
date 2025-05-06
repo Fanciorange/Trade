@@ -30,6 +30,8 @@ class DataProcessor():
                     res[new_key] = data[name][key]
             if 'label' in data:
                 res['label'] = data['label']
+            if 'rise_ratio' in data:
+                res['rise_ratio'] = data['rise_ratio']
             return res
         finaldata = []
         for data in datas:
