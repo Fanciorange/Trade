@@ -145,7 +145,7 @@ def process_id(id,is_smooth=False):
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
         "label": label,
-        "upnum": upper.item(),
+        "up_num": upper.item(),
         "down_num": down.item(),
         "steady_num": steady.item()
         }
