@@ -25,6 +25,8 @@ class DataProcessor():
         def rename_factor(data):
             res = {}
             for name in ['day_factor', 'hour_factor', 'minute_factor']:
+                if name not in data:
+                    continue
                 for key in data[name].keys():
                     new_key = name[:name.index("_")+1]+key
                     res[new_key] = data[name][key]
@@ -56,8 +58,8 @@ class DataProcessor():
     def get_X(self,factornames):
         X = self.data[factornames].values
         return X
-dataprocessor = DataProcessor(["train_factor_1.json"])
-factorls = dataprocessor.get_random_factornames()
-X,y = dataprocessor.get_X_y(factorls)
+# dataprocessor = DataProcessor(["train_factor_1.json"])
+# factorls = dataprocessor.get_random_factornames()
+# X,y = dataprocessor.get_X_y(factorls)
 
 

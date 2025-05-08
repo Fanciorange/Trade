@@ -3,7 +3,7 @@ import json
 import time
 from multiprocessing import Pool, cpu_count
 from analyse import *
-with open("datas/train_index",'r',encoding='utf-8')as f:
+with open("datas/indexs",'r',encoding='utf-8')as f:
     indexs = json.loads(f.read())
 
 import inspect
@@ -27,8 +27,10 @@ def execute_all_methods(cls,instance=None):
     for method_name in methods:
         method = getattr(instance, method_name)
         vals = method()
-        # if method_name in ignore_name:
-        #     continue
+        if vals is None:
+            continue
+        if method_name in ignore_name:
+            continue
         if method_name in special_name:
             if isinstance(vals,dict):
                 for k,val in vals.items():
@@ -59,12 +61,12 @@ data['date'] =pd.to_datetime(data['date'])
 
 data = data.sort_values(by='date')
 # 一次性提取所有数据
-all_data = [data.iloc[index[0]:index[2]] for index in indexs]
+all_data = [data.iloc[index:index+3900] for index in indexs]
 
 
 
 
-def reorganize_stock_data(df,tp="s",is_smooth=True):
+def reorganize_stock_data(df,tp="s",is_smooth=False):
     if tp == "s":
         k = 15
     elif tp =='d':
@@ -100,60 +102,45 @@ def reorganize_stock_data(df,tp="s",is_smooth=True):
 
 start = time.time()
 res=[]
-
+def check(last1,last6):
+    k = (last1-last6)/last6
+    v1 = -0.004
+    v2 = 0.004
+    if k<=v1:
+        return -1
+    if k>=v2:
+        return 1
+    return 0
 def process_id(id,is_smooth=True):
     # with label
     data =all_data[id][:-300]
+    minute = reorganize_stock_data(data,"m",is_smooth)
+    second = reorganize_stock_data(data,"s",is_smooth)
+    mclose = minute['close'].values
+    (mclose[-1]-mclose[-6])
+    label = check(mclose[-1],mclose[-6])
 
-    day = reorganize_stock_data(data,"d",is_smooth)
-    minute = reorganize_stock_data(data[-9000:],"m",is_smooth)[-120:]
-    hour = reorganize_stock_data(data[-86400:],"h",is_smooth)[-120:]
-    second = reorganize_stock_data(data[-7200:],"s",is_smooth)[-120:]
-
-    last300s = all_data[id]['close'][-300:].values
-    cur_v = all_data[id]['close'].values[-300]
-    last300_rates = (last300s-cur_v)/cur_v
-    upper,down = (last300_rates>0.0002).sum(),(last300_rates<-0.0002).sum()
-    steady = len(last300s)-upper-down
-    
-    label = 1 if last300_rates [-5:].sum()>0 else -1
-
-    day_last_10= day['close'].values[-10:].tolist()
-    hour_last_10=  hour['close'].values[-10:].tolist()
     minute_last_10= minute['close'].values[-10:].tolist()
     second_last_10= second['close'].values[-10:].tolist()
-    day_last_10 = {k:v for k,v in enumerate(day_last_10)}
-    hour_last_10 = {k:v for k,v in enumerate(hour_last_10)}
     minute_last_10 = {k:v for k,v in enumerate(minute_last_10)}
     second_last_10 = {k:v for k,v in enumerate(second_last_10)}
-    day = Analysis(day) 
-    hour = Analysis(hour)
+
     minute = Analysis(minute)
     second = Analysis(second)
-
-    day_index = execute_all_methods(Analysis,day)
-    hour_index = execute_all_methods(Analysis,hour)
     minute_index = execute_all_methods(Analysis,minute)
     second_index = execute_all_methods(Analysis,second)
-    del day,hour,minute,second
+    del minute,second
     return {
-        "day_factor":day_index ,
-        "hour_factor":hour_index,
         "minute_factor":minute_index,
         "second_factor":second_index,
-        "daylast_10": day_last_10,
-        "hourlast_10": hour_last_10,
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
         "label": label,
-        "up_num": upper.item(),
-        "down_num": down.item(),
-        "steady_num": steady.item()
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
-
+process_id(1)
 with Pool(processes=num_processes) as pool:
-    results = pool.map(process_id, range(len(all_data)//2))
+    results = pool.map(process_id, range(len(all_data)//10))
 
 # results =[]
 # for i in range(len(all_data)//2):
@@ -165,11 +152,12 @@ for item in results:
 print(cnt,len(results))
 print("start")
 s = time.time()
-with open('train_factor_1_smooth.json','w')as f:
-    f.write(json.dumps(results))
+with open('train_factor_5m.json','w')as f:
+    f.write(json.dumps(results[:int(len(results)*0.8)]))
+with open('test_factor_5m.json','w')as f:
+    f.write(json.dumps(results[int(len(results)*0.8):]))
+
 print("done")
-
-
 print(time.time()-start)
 
 

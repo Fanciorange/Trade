@@ -9,16 +9,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report
 from dataloader import DataProcessor
-train_data_processor = DataProcessor(["train_factor_1.json","train_factor_2.json"])
-test_data_processor = DataProcessor(["test_factor.json"])
+train_data_processor = DataProcessor(["test_factor_5m.json"])
+test_data_processor = DataProcessor(["train_factor_5m.json"])
 
 top_models = []
 
-for i in range(20):
+for i in range(1):
     start = time.time()
     if i==0:
         with open("/data/users/zzp/trade_data/features.json",'r')as f:
             s = f.read()
+        columes = json.loads(s)
     else:
         columes = train_data_processor.get_random_factornames(-1)
 
