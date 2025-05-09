@@ -3,7 +3,7 @@ import json
 import time
 from multiprocessing import Pool, cpu_count
 from analyse import *
-with open("/data/users/zzp/trade_data/datas/train_index",'r',encoding='utf-8')as f:
+with open("datas/test_index",'r',encoding='utf-8')as f:
     indexs = json.loads(f.read())
 
 import inspect
@@ -21,13 +21,25 @@ def execute_all_methods(cls,instance=None):
      
     ignore_name =['Aroon_2', 'BBANDS_3', 'HT_PHASOR', 'HT_SINE', 'MACDFIX_3', 
                   'MACD_3', 'MININDEX', 'STOCH', 'STOCHF', 'STOCHRSI', 'STOCH_2']
+    special_name =['Aroon_2', 'BBANDS_3', 'MACDFIX_3', 
+                  'MACD_3', 'STOCH', 'STOCHF', 'STOCHRSI', 'STOCH_2']
     res ={}
     for method_name in methods:
+        method = getattr(instance, method_name)
+        vals = method()
         if method_name in ignore_name:
             continue
-        method = getattr(instance, method_name)
-        vals = method().item()
-        res[method_name] = vals
+        if method_name in special_name:
+            if isinstance(vals,dict):
+                for k,val in vals.item():
+                    subname = k
+                    res[subname] = val.item()
+            else:
+                 for i,val in enumerate(vals):
+                    subname = method_name+f"_{i+1}"
+                    res[subname] = val.item()
+        else:
+            res[method_name] = vals.item()
         
     return res
 
@@ -36,7 +48,7 @@ def execute_all_methods(cls,instance=None):
 
 
 
-file_path = '/data/users/zzp/trade_data/datas/BTC_USDT-1s.feather'
+file_path = 'datas/BTC_USDT-1s.feather'
 
 data = pd.read_feather(file_path)
 
@@ -51,7 +63,7 @@ all_data = [data.iloc[index[0]:index[2]] for index in indexs]
 
 
 
-def reorganize_stock_data(df,tp="s"):
+def reorganize_stock_data(df,tp="s",is_smooth=False):
     if tp == "s":
         k = 15
     elif tp =='d':
@@ -77,7 +89,10 @@ def reorganize_stock_data(df,tp="s"):
     ohlcv_df = df.groupby('group').agg(agg_dict)
     # 重置索引并清理列名（可选）
     ohlcv_df = ohlcv_df.reset_index(drop=True)
-    
+    if is_smooth:
+        window = 5  # 5日平滑
+        cols_to_smooth = ['open', 'high', 'low', 'close']
+        ohlcv_df[cols_to_smooth] = ohlcv_df[cols_to_smooth].rolling(window=window).mean()
     return ohlcv_df
 
 
@@ -85,15 +100,22 @@ def reorganize_stock_data(df,tp="s"):
 start = time.time()
 res=[]
 
-def process_id(id):
+def process_id(id,is_smooth=True):
     # with label
     data =all_data[id][:-300]
-    day = reorganize_stock_data(data,"d")
-    minute = reorganize_stock_data(data[-9000:],"m")[-120:]
-    hour = reorganize_stock_data(data[-86400:],"h")[-120:]
-    second = reorganize_stock_data(data[-2400:],"s")[-120:]
-    v1,v2= second['close'].values[-1], all_data[id]["close"].values[-1]
-    label = 1 if (v2-v1)/v1>0.001 else -1
+
+    day = reorganize_stock_data(data,"d",is_smooth)
+    minute = reorganize_stock_data(data[-9000:],"m",is_smooth)[-120:]
+    hour = reorganize_stock_data(data[-86400:],"h",is_smooth)[-120:]
+    second = reorganize_stock_data(data[-7200:],"s",is_smooth)[-120:]
+
+    last300s = all_data[id]['close'][-300:].values
+    cur_v = all_data[id]['close'].values[-300]
+    last300_rates = (last300s-cur_v)/cur_v
+    upper,down = (last300_rates>0.0002).sum(),(last300_rates<-0.0002).sum()
+    steady = len(last300s)-upper-down
+    
+    label = 1 if last300_rates [-1]>0 else -1
 
     day_last_10= day['close'].values[-10:].tolist()
     hour_last_10=  hour['close'].values[-10:].tolist()
@@ -113,18 +135,6 @@ def process_id(id):
     minute_index = execute_all_methods(Analysis,minute)
     second_index = execute_all_methods(Analysis,second)
     del day,hour,minute,second
-
-    # ===== 计算最近5分钟上涨比例 =====
-    last5min = all_data[id][-300:]
-    #last5min = last5min.sort_index()
-    if len(last5min) < 300:
-        rise_ratio = None  # 不足5个数据点则无法计算
-    else:
-        base_price = last5min['open'].values[0]
-        close_prices = last5min['close'].values
-        higher_count = sum(p > base_price for p in close_prices)
-        rise_ratio = higher_count / len(close_prices)
-
     return {
         "day_factor":day_index ,
         "hour_factor":hour_index,
@@ -135,14 +145,17 @@ def process_id(id):
         "minutelast_10": minute_last_10,
         "secondlast_10": second_last_10,
         "label": label,
-
-        "rise_ratio": rise_ratio
+        "up_num": upper.item(),
+        "down_num": down.item(),
+        "steady_num": steady.item()
         }
 num_processes = cpu_count()-8  # 获取 CPU 核心数
 
 with Pool(processes=num_processes) as pool:
-    results = pool.map(process_id, range(len(all_data)//4))
-
+    results = pool.map(process_id, range(len(all_data)//2,len(all_data)))
+# results =[]
+# for i in range(len(all_data)//2):
+#     results.append(process_id(i))
 cnt= 0
 for item in results:
     if item['label']==1:
@@ -150,12 +163,16 @@ for item in results:
 print(cnt,len(results))
 print("start")
 s = time.time()
-with open('train_factor_r1.json','w')as f:
+with open('test_factor_1_steady.json','w')as f:
     f.write(json.dumps(results))
 print("done")
 
 
 print(time.time()-start)
 
-print("示例样本数据如下：")
-print(json.dumps(results[0], indent=2))  # 仅输出第一条结果，格式化便于查看
+
+
+
+  
+
+

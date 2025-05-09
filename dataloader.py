@@ -28,10 +28,10 @@ class DataProcessor():
                 for key in data[name].keys():
                     new_key = name[:name.index("_")+1]+key
                     res[new_key] = data[name][key]
-            if 'label' in data:
-                res['label'] = data['label']
-            if 'rise_ratio' in data:
-                res['rise_ratio'] = data['rise_ratio']
+            for name in ['label','up_num','down_num','steady_num']:
+                if name in data:
+                    res[name] = data[name]
+                
             return res
         finaldata = []
         for data in datas:
@@ -42,8 +42,8 @@ class DataProcessor():
         return df_filled
     def get_random_factornames(self,k=50,seed=None):
         valid_columes = self.data.loc[:, self.data.nunique() != 1].columns.to_list()
-        valid_columes.remove("label")
-        valid_columes.remove("rise_ratio")
+        for name in ['label','up_num','down_num','steady_num']:
+            valid_columes.remove(name)
         if seed:
             random.seed(seed)
         if k==-1:
@@ -56,9 +56,8 @@ class DataProcessor():
     def get_X(self,factornames):
         X = self.data[factornames].values
         return X
-
-dataprocessor = DataProcessor(["train_factor_r1.json"])
-factorls = dataprocessor.get_random_factornames()
-X,y = dataprocessor.get_X_y(factorls)
+#dataprocessor = DataProcessor(["train_factor_1.json"])
+#factorls = dataprocessor.get_random_factornames()
+#X,y = dataprocessor.get_X_y(factorls)
 
 
